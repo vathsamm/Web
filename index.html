@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>12星座 黏另一半 (假影片播放器 含粒子下載 - 含文字邊距)</title>
+    <title>12星座 黏另一半 (假影片播放器 含粒子下載 - 簡易版)</title>
     <style>
         body {
             background-color: black; /* Black background for the whole page */
@@ -117,6 +117,7 @@
             color: gray;
             font-size: 0.9em;
             margin-top: 5px;
+            min-height: 1.1em; /* Ensure space for status text */
         }
 
 
@@ -159,8 +160,8 @@
 
     <!-- Download section fixed at the bottom -->
     <div class="download-section">
-        <button id="downloadButton">下載假影片 (含文字 5秒)</button>
-        <p id="status" style="color: gray; font-size: 0.9em;"></p>
+        <button id="downloadButton">下載影片 (簡易版)</button>
+        <p id="status"></p>
     </div>
 
 
@@ -233,7 +234,12 @@
             canvas.style.height = displayHeight + 'px';
 
             // Scale the drawing context to match the device pixel ratio
+            // Reset transform first to avoid accumulating scaling
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.scale(devicePixelRatio, devicePixelRatio);
+
+             console.log(`Canvas initialized: ${canvas.width}x${canvas.height} internal, ${displayWidth}x${displayHeight} displayed.`);
+
 
             // Re-initialize particles for the new (unscaled logical) size
              for (let i = 0; i < numberOfParticles; i++) {
@@ -250,20 +256,20 @@
 
         }
 
-        // Animation loop
-        function animate() {
-            // Clear canvas with a slightly transparent black to create trails
-            // Use the unscaled display dimensions for clearing area
+        // Draw everything on the canvas (particles and text)
+        function drawCanvas() {
             const screenElement = canvas.parentElement;
             const displayWidth = screenElement.clientWidth;
             const displayHeight = screenElement.clientHeight;
 
+            // Clear canvas with a slightly transparent black to create trails
             ctx.fillStyle = 'rgba(17, 17, 17, 0.1)';
+            // When using setTransform/scale, clearing with the unscaled dimensions works correctly
             ctx.fillRect(0, 0, displayWidth, displayHeight);
+
 
             // Draw particles
             for (let i = 0; i < particles.length; i++) {
-                particles[i].update(); // Updates using unscaled speeds
                 particles[i].draw(); // Draws using scaled context on unscaled positions
             }
 
@@ -275,23 +281,32 @@
             const centerX = displayWidth / 2; // Center in unscaled coordinates
             const availableWidth = displayWidth - 2 * screenPaddingHorizontal; // Unscaled width for text
 
-            // Adjust the initial Y position for the title to be higher
-            // ~2cm from the top of the screen area
-            let startY = 105; // Still 105 from previous adjustment
+            // Initial Y position for the title (adjusted)
+            let startY = 105; // Base startY
 
             // Draw Title
             const titleFontSize = 24; // Unscaled font size (pixels)
             ctx.font = `bold ${titleFontSize}px sans-serif`; // Use unscaled font size here
-            const titleWidth = ctx.measureText(titleText).width / devicePixelRatio; // Unscaled width
+            const titleWidth = ctx.measureText(titleText).width; // Unscaled width (measureText is affected by ctx.scale)
 
-            // Optional: Check if title is too wide for the safe area
             if (titleWidth > availableWidth) {
-                 console.warn('Title text is too wide for the safe area (', titleWidth.toFixed(0), 'px vs', availableWidth.toFixed(0), 'px available). It may overlap the "invisible margin".');
-                 // If you needed truncation: titleText = truncateText(ctx, titleText, availableWidth);
+                 console.warn('Title text is too wide for the safe area (', titleWidth.toFixed(0), 'px vs', availableWidth.toFixed(0), 'px available).');
             }
 
+            // Add a text shadow for better contrast if needed
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
             ctx.fillText(titleText, centerX, startY);
-            startY += 40; // Unscaled space after title (adjust based on title height)
+
+            // Reset shadow for subsequent drawings
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+
+
+            startY += 40; // Unscaled space after title
 
             // Draw List Items
             const listItemFontSize = 18; // Unscaled font size (pixels)
@@ -299,57 +314,81 @@
             const lineHeight = 25; // Unscaled space between list items (adjust as needed)
             const screenPaddingVertical = 15; // Unscaled vertical padding at bottom
 
+             // Reset shadow for list items if it was applied above
+             ctx.shadowColor = 'transparent';
+             ctx.shadowBlur = 0;
+
+
             for (let i = 0; i < listItems.length; i++) {
                 const item = listItems[i];
-                 const itemWidth = ctx.measureText(item).width / devicePixelRatio; // Unscaled width
+                const itemWidth = ctx.measureText(item).width; // Unscaled width
 
-                 // Optional: Check if list item is too wide
-                 if (itemWidth > availableWidth) {
-                     console.warn('List item text is too wide for the safe area (', itemWidth.toFixed(0), 'px vs', availableWidth.toFixed(0), 'px available). It may overlap the "invisible margin":', item);
-                     // If you needed truncation: item = truncateText(ctx, item, availableWidth);
+                if (itemWidth > availableWidth) {
+                     console.warn('List item text is too wide for the safe area (', itemWidth.toFixed(0), 'px vs', availableWidth.toFixed(0), 'px available):', item);
                  }
 
-                 // Check if item will fit vertically before drawing
+                // Check if item will fit vertically before drawing - use unscaled coordinates
                 if (startY + i * lineHeight > displayHeight - screenPaddingVertical) {
                      break; // Stop drawing if out of space
                 }
                 ctx.fillText(item, centerX, startY + i * lineHeight);
             }
              // --- End Draw Text on Canvas ---
+        }
 
-
+        // Main particle animation loop (draws everything)
+        function animate() {
+             // Update particle positions
+             for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+             }
+             // Redraw the entire canvas
+            drawCanvas();
             animationId = requestAnimationFrame(animate);
         }
 
-        // --- MediaRecorder Setup ---
+        // --- MediaRecorder Setup (Simple Download) ---
 
         function startRecording() {
             statusText.textContent = "正在錄製影片 (5秒)...";
             downloadButton.disabled = true;
-            recordedChunks.length = 0;
+            recordedChunks.length = 0; // Clear previous data
 
             try {
                 // Attempt to capture a stream from the canvas
-                // The stream resolution will be the internal canvas.width/height, which is high-res
-                const stream = canvas.captureStream(60); // Capture at 60 frames per second
+                // Use default frame rate for potentially better stability vs 60fps
+                const stream = canvas.captureStream(); // CAPTURING AT BROWSER DEFAULT FRAME RATE (approx 30fps)
 
-                // Create a MediaRecorder instance
-                const options = { mimeType: 'video/webm; codecs=vp9' };
-                 if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                     options.mimeType = 'video/webm; codecs=vp8';
-                      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                          options.mimeType = 'video/webm';
-                           if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                               options.mimeType = 'video/ogg; codecs=theora';
-                                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                                    statusText.textContent = "錯誤：瀏覽器不支援錄影功能。";
-                                    downloadButton.disabled = false;
-                                    console.error('MediaRecorder not supported in this browser.');
-                                    return;
-                                }
-                           }
-                      }
-                 }
+                 // Define preferred MIME types in order (MP4 first, then WebM fallbacks)
+                const preferredMimeTypes = [
+                    // Try H.264 MP4 first (support varies widely for canvas recording)
+                    'video/mp4; codecs="avc1.42001E"', // Specific H.264 profile, might have better luck
+                    'video/mp4; codecs=avc1', // Generic H.264
+                    'video/mp4', // Just MP4
+                    'video/webm; codecs=vp9', // High quality WebM
+                    'video/webm; codecs=vp8', // Older WebM
+                    'video/webm', // Generic WebM
+                    'video/ogg; codecs=theora' // Ogg fallback
+                ];
+
+                let supportedMimeType = null;
+                for (let i = 0; i < preferredMimeTypes.length; i++) {
+                    if (MediaRecorder.isTypeSupported(preferredMimeTypes[i])) {
+                        supportedMimeType = preferredMimeTypes[i];
+                        break; // Use the first supported type found
+                    }
+                }
+
+                if (!supportedMimeType) {
+                    statusText.textContent = "錯誤：瀏覽器不支援任何錄影格式。";
+                    downloadButton.disabled = false;
+                    console.error('MediaRecorder supported type not found.');
+                    return;
+                }
+
+                const options = { mimeType: supportedMimeType };
+                 console.log("Using MIME type:", supportedMimeType); // Log which type was chosen
+
 
                 mediaRecorder = new MediaRecorder(stream, options);
 
@@ -361,17 +400,27 @@
 
                 mediaRecorder.onstop = () => {
                     statusText.textContent = "錄製完成，正在準備下載...";
-                    const blob = new Blob(recordedChunks, { type: options.mimeType });
+                    const blob = new Blob(recordedChunks, { type: supportedMimeType }); // Use the actual supported type for the Blob
                     const url = URL.createObjectURL(blob);
 
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    a.download = 'zodiac_video.webm';
+
+                    // Determine file extension based on the chosen MIME type
+                    let fileExtension = '.webm'; // Default to webm
+                    if (supportedMimeType.includes('mp4')) {
+                        fileExtension = '.mp4';
+                    } else if (supportedMimeType.includes('ogg')) {
+                         fileExtension = '.ogv'; // Ogg video extension
+                    }
+                    a.download = 'zodiac_video' + fileExtension; // Set download filename
+
                     document.body.appendChild(a);
 
                     a.click();
 
+                    // Clean up
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
                     statusText.textContent = "下載開始 (請檢查您的下載資料夾)";
@@ -380,6 +429,7 @@
 
                 mediaRecorder.start();
 
+                // Stop recording after 5 seconds
                 setTimeout(() => {
                     if (mediaRecorder.state !== 'inactive') {
                         mediaRecorder.stop();
