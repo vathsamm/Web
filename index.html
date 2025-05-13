@@ -1,262 +1,413 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Color Clicker</title>
+    <title>12星座 黏另一半 (假影片播放器 含粒子下載 - 含文字邊距)</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            display: flex;
+            background-color: black; /* Black background for the whole page */
+            color: white; /* Default text color */
+            font-family: sans-serif; /* Readable font */
+            margin: 0; /* Remove default body margin */
+            padding: 20px; /* Add some padding around content */
+            padding-bottom: 80px; /* Add padding at the bottom to prevent content hiding behind fixed button */
+            box-sizing: border-box;
+            display: flex; /* Use flexbox to center the player */
+            justify-content: center; /* Center horizontally */
+            align-items: flex-start; /* Align items to the start (top) so player isn't always vertically centered */
+            min-height: 100vh; /* Ensure body takes at least full viewport height */
+            overflow-y: auto; /* Add scroll if content overflows */
+            overflow-x: hidden; /* Hide horizontal scrollbar if player is slightly too wide */
+        }
+
+        .fake-video-player-container {
+            max-width: 350px; /* Set a max width for the player (typical for 9:16 on desktop) */
+            width: 90%; /* Player takes up 90% of container width, up to max-width */
+            background-color: #222; /* Dark background for the player frame */
+            border-radius: 15px; /* Rounded corners for the player */
+            overflow: hidden; /* Hide anything that spills out */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); /* Add a subtle shadow */
+            display: flex; /* Arrange screen and controls vertically */
             flex-direction: column;
+            margin-top: 20px; /* Add some margin at the top */
+        }
+
+        .video-screen {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 9 / 16; /* KEEPS 9:16 */
+            background-color: #111;
+            display: flex;
+            justify-content: center;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
+            box-sizing: border-box;
         }
 
-        #game-container {
+        #particle-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .video-content {
+            display: none; /* The original HTML text content - HIDDEN */
+        }
+
+        .fake-controls {
+            background-color: #333;
+            height: 40px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 10px;
+            z-index: 10;
+        }
+
+        .fake-controls .control-placeholder {
+            width: 20px;
+            height: 20px;
+            background-color: #555;
+            border-radius: 3px;
+        }
+
+        .fake-controls .play-placeholder {
+             width: 25px;
+             height: 25px;
+             background-color: #eee;
+             border-radius: 50%;
+        }
+
+        .download-section {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 15px 0;
             text-align: center;
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
         }
 
-        #instruction {
-            font-size: 28px;
-            margin-bottom: 20px;
-            font-weight: bold;
-        }
-
-        #color-squares {
-            display: grid;
-            grid-template-columns: repeat(2, 100px); /* 2x2 grid */
-            gap: 15px;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        .square {
-            width: 100px;
-            height: 100px;
-            border: 2px solid #333;
-            border-radius: 5px;
+        #downloadButton {
+            padding: 10px 20px;
+            font-size: 1em;
             cursor: pointer;
-            transition: transform 0.1s ease;
-        }
-        .square:hover {
-            transform: scale(1.05);
-        }
-        .square:active {
-            transform: scale(0.95);
-        }
-
-        #score-board {
-            font-size: 22px;
-            margin-top: 10px;
-        }
-        #timer-board {
-            font-size: 18px;
-            color: #555;
-        }
-
-        #start-button, #restart-button {
-            padding: 12px 25px;
-            font-size: 18px;
-            cursor: pointer;
-            background-color: #4CAF50;
+            background-color: #007bff;
             color: white;
             border: none;
             border-radius: 5px;
-            margin-top: 20px;
-        }
-        #start-button:hover, #restart-button:hover {
-            background-color: #45a049;
+            transition: background-color 0.3s ease;
         }
 
-        #game-over-screen {
-            display: none; /* Hidden initially */
-            text-align: center;
+        #downloadButton:hover:not(:disabled) {
+            background-color: #0056b3;
         }
+
+         #downloadButton:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        #status {
+            color: gray;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
 
     </style>
 </head>
 <body>
 
-    <div id="game-container">
-        <div id="start-screen">
-            <h1>Color Clicker!</h1>
-            <p>Click the square that matches the color name.</p>
-            <button id="start-button">Start Game</button>
-        </div>
+    <div class="fake-video-player-container">
+        <div class="video-screen">
+            <!-- Canvas for the particle animation AND text -->
+            <canvas id="particle-canvas"></canvas>
 
-        <div id="game-play-area" style="display: none;">
-            <div id="instruction">Click the Color: <span id="target-color-name">COLOR</span></div>
-            <div id="color-squares">
-                <!-- Squares will be generated here by JavaScript -->
+             <!-- The original HTML text content - HIDDEN -->
+             <div class="video-content">
+                <h1>12星座 都是這樣黏另一半的</h1>
+
+                <ul>
+                    <li>🥰 牡羊座：每天跟你貼貼</li>
+                    <li>🥰 金牛座：出門都要牽手</li>
+                    <li>🥰 雙子座：整天親親抱抱</li>
+                    <li>🥰 巨蟹座：放假就黏一起</li>
+                    <li>🥰 獅子座：你回家才肯睡</li>
+                    <li>🥰 處女座：照三餐傳訊息</li>
+                    <li>🥰 天秤座：上廁所都要跟</li>
+                    <li>🥰 天蠍座：整天黏在床上</li>
+                    <li>🥰 射手座：出門都要帶你</li>
+                    <li>🥰 魔羯座：隨時都要報備</li>
+                    <li>🥰 水瓶座：天天把你榨乾</li>
+                    <li>🥰 雙魚座：堅持每天見面</li>
+                </ul>
             </div>
-            <div id="score-board">Score: <span id="score">0</span></div>
-            <div id="timer-board">Time Left: <span id="time">10</span>s</div>
         </div>
-
-        <div id="game-over-screen">
-            <h2>Game Over!</h2>
-            <p>Your Final Score: <span id="final-score">0</span></p>
-            <button id="restart-button">Play Again?</button>
+        <div class="fake-controls">
+             <div class="play-placeholder"></div>
+             <div class="control-placeholder"></div>
+             <div class="control-placeholder"></div>
+             <div class="control-placeholder"></div>
         </div>
     </div>
 
+    <!-- Download section fixed at the bottom -->
+    <div class="download-section">
+        <button id="downloadButton">下載假影片 (含文字 5秒)</button>
+        <p id="status" style="color: gray; font-size: 0.9em;"></p>
+    </div>
+
+
     <script>
-        const colors = [
-            { name: "RED", value: "#FF0000" },
-            { name: "BLUE", value: "#0000FF" },
-            { name: "GREEN", value: "#008000" },
-            { name: "YELLOW", value: "#FFFF00" },
-            { name: "PURPLE", value: "#800080" },
-            { name: "ORANGE", value: "#FFA500" },
-            { name: "PINK", value: "#FFC0CB" },
-            { name: "BLACK", value: "#000000" }
-        ];
-        const numSquares = 4; // Number of squares to display (e.g., 2x2 grid)
-        const roundTime = 10; // Time per round in seconds
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        const downloadButton = document.getElementById('downloadButton');
+        const statusText = document.getElementById('status');
+        const videoContentDiv = document.querySelector('.video-content');
 
-        const startScreen = document.getElementById('start-screen');
-        const gamePlayArea = document.getElementById('game-play-area');
-        const gameOverScreen = document.getElementById('game-over-screen');
+        let particles = [];
+        const numberOfParticles = 60;
+        let animationId;
+        let mediaRecorder;
+        const recordedChunks = [];
+        const videoDuration = 5000; // 5 seconds in milliseconds
 
-        const instructionText = document.getElementById('target-color-name');
-        const colorSquaresContainer = document.getElementById('color-squares');
-        const scoreDisplay = document.getElementById('score');
-        const timeDisplay = document.getElementById('time');
-        const finalScoreDisplay = document.getElementById('final-score');
+        // Get text content from the hidden HTML
+        const titleText = videoContentDiv.querySelector('h1').textContent;
+        const listItems = Array.from(videoContentDiv.querySelectorAll('li')).map(li => li.textContent);
 
-        const startButton = document.getElementById('start-button');
-        const restartButton = document.getElementById('restart-button');
+        // Get device pixel ratio
+        const devicePixelRatio = window.devicePixelRatio || 1;
 
-        let currentScore = 0;
-        let currentTime = roundTime;
-        let targetColor;
-        let timerInterval;
-        let gameActive = false;
-
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
+        // Particle class (same as before)
+        class Particle {
+            constructor(x, y, size, speedX, speedY) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                const alpha = Math.random() * 0.5 + 0.2;
+                this.color = 'rgba(255, 255, 255, ' + alpha + ')';
+                this.speedX = speedX;
+                this.speedY = speedY;
             }
-            return array;
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                 // Wrap around based on unscaled logical dimensions (handled by context scale)
+                const unscaledWidth = canvas.width / devicePixelRatio;
+                const unscaledHeight = canvas.height / devicePixelRatio;
+                if (this.x < 0 - this.size) this.x = unscaledWidth + this.size;
+                if (this.x > unscaledWidth + this.size) this.x = 0 - this.size;
+                if (this.y < 0 - this.size) this.y = unscaledHeight + this.size;
+                if (this.y > unscaledHeight + this.size) this.y = 0 - this.size;
+            }
         }
 
-        function getRandomColors(count, ensureColor) {
-            let availableColors = [...colors];
-            // Remove ensureColor from availableColors to avoid duplicates if it's picked as a distractor
-            availableColors = availableColors.filter(c => c.name !== ensureColor.name);
-            
-            shuffleArray(availableColors);
-            
-            let chosenDistractors = availableColors.slice(0, count - 1);
-            let finalSquares = [ensureColor, ...chosenDistractors];
-            
-            return shuffleArray(finalSquares); // Shuffle the final set including the target
+
+        // Initialize particles and size canvas
+        function initParticles() {
+            particles = [];
+            const screenElement = canvas.parentElement;
+            const displayWidth = screenElement.clientWidth;
+            const displayHeight = screenElement.clientHeight;
+
+            // Set the canvas's *internal* dimensions based on device pixel ratio
+            canvas.width = displayWidth * devicePixelRatio;
+            canvas.height = displayHeight * devicePixelRatio;
+
+            // Set the canvas's *displayed* size using CSS styles
+            canvas.style.width = displayWidth + 'px';
+            canvas.style.height = displayHeight + 'px';
+
+            // Scale the drawing context to match the device pixel ratio
+            ctx.scale(devicePixelRatio, devicePixelRatio);
+
+            // Re-initialize particles for the new (unscaled logical) size
+             for (let i = 0; i < numberOfParticles; i++) {
+                const size = Math.random() * 2 + 1; // Unscaled size
+                const x = Math.random() * displayWidth; // Unscaled position
+                const y = Math.random() * displayHeight; // Unscaled position
+                const speed = Math.random() * 0.8 + 0.1; // Unscaled speed
+                const angle = Math.random() * Math.PI * 2; // Random direction
+                const speedX = Math.cos(angle) * speed;
+                const speedY = Math.sin(angle) * speed;
+
+                particles.push(new Particle(x, y, size, speedX, speedY));
+            }
+
         }
 
-        function setupNewRound() {
-            if (!gameActive) return;
+        // Animation loop
+        function animate() {
+            // Clear canvas with a slightly transparent black to create trails
+            // Use the unscaled display dimensions for clearing area
+            const screenElement = canvas.parentElement;
+            const displayWidth = screenElement.clientWidth;
+            const displayHeight = screenElement.clientHeight;
 
-            // Pick a random target color
-            targetColor = colors[Math.floor(Math.random() * colors.length)];
-            instructionText.textContent = targetColor.name;
-            // Optional: Stroop effect (text color different from target color name)
-            // const randomTextColor = colors[Math.floor(Math.random() * colors.length)].value;
-            // instructionText.style.color = randomTextColor;
+            ctx.fillStyle = 'rgba(17, 17, 17, 0.1)';
+            ctx.fillRect(0, 0, displayWidth, displayHeight);
+
+            // Draw particles
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update(); // Updates using unscaled speeds
+                particles[i].draw(); // Draws using scaled context on unscaled positions
+            }
+
+            // --- Draw Text on Canvas ---
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center'; // Center text horizontally
+
+            const screenPaddingHorizontal = 15; // Unscaled horizontal padding/margin
+            const centerX = displayWidth / 2; // Center in unscaled coordinates
+            const availableWidth = displayWidth - 2 * screenPaddingHorizontal; // Unscaled width for text
+
+            // Adjust the initial Y position for the title to be higher
+            // ~2cm from the top of the screen area
+            let startY = 105; // Still 105 from previous adjustment
+
+            // Draw Title
+            const titleFontSize = 24; // Unscaled font size (pixels)
+            ctx.font = `bold ${titleFontSize}px sans-serif`; // Use unscaled font size here
+            const titleWidth = ctx.measureText(titleText).width / devicePixelRatio; // Unscaled width
+
+            // Optional: Check if title is too wide for the safe area
+            if (titleWidth > availableWidth) {
+                 console.warn('Title text is too wide for the safe area (', titleWidth.toFixed(0), 'px vs', availableWidth.toFixed(0), 'px available). It may overlap the "invisible margin".');
+                 // If you needed truncation: titleText = truncateText(ctx, titleText, availableWidth);
+            }
+
+            ctx.fillText(titleText, centerX, startY);
+            startY += 40; // Unscaled space after title (adjust based on title height)
+
+            // Draw List Items
+            const listItemFontSize = 18; // Unscaled font size (pixels)
+            ctx.font = `${listItemFontSize}px sans-serif`; // Use unscaled font size here
+            const lineHeight = 25; // Unscaled space between list items (adjust as needed)
+            const screenPaddingVertical = 15; // Unscaled vertical padding at bottom
+
+            for (let i = 0; i < listItems.length; i++) {
+                const item = listItems[i];
+                 const itemWidth = ctx.measureText(item).width / devicePixelRatio; // Unscaled width
+
+                 // Optional: Check if list item is too wide
+                 if (itemWidth > availableWidth) {
+                     console.warn('List item text is too wide for the safe area (', itemWidth.toFixed(0), 'px vs', availableWidth.toFixed(0), 'px available). It may overlap the "invisible margin":', item);
+                     // If you needed truncation: item = truncateText(ctx, item, availableWidth);
+                 }
+
+                 // Check if item will fit vertically before drawing
+                if (startY + i * lineHeight > displayHeight - screenPaddingVertical) {
+                     break; // Stop drawing if out of space
+                }
+                ctx.fillText(item, centerX, startY + i * lineHeight);
+            }
+             // --- End Draw Text on Canvas ---
 
 
-            // Get colors for squares
-            const squareColors = getRandomColors(numSquares, targetColor);
-
-            colorSquaresContainer.innerHTML = ''; // Clear previous squares
-            squareColors.forEach(colorObj => {
-                const square = document.createElement('div');
-                square.classList.add('square');
-                square.style.backgroundColor = colorObj.value;
-                square.dataset.colorName = colorObj.name; // Store the color name
-                square.addEventListener('click', handleSquareClick);
-                colorSquaresContainer.appendChild(square);
-            });
-
-            currentTime = roundTime;
-            timeDisplay.textContent = currentTime;
-            resetTimer();
-            timerInterval = setInterval(updateTimer, 1000);
+            animationId = requestAnimationFrame(animate);
         }
 
-        function handleSquareClick(event) {
-            if (!gameActive) return;
+        // --- MediaRecorder Setup ---
 
-            const clickedColorName = event.target.dataset.colorName;
-            clearInterval(timerInterval); // Stop timer on click
+        function startRecording() {
+            statusText.textContent = "正在錄製影片 (5秒)...";
+            downloadButton.disabled = true;
+            recordedChunks.length = 0;
 
-            if (clickedColorName === targetColor.name) {
-                currentScore++;
-                scoreDisplay.textContent = currentScore;
-                // Optional: Add a small visual feedback for correct click
-                event.target.style.outline = "3px solid lightgreen";
+            try {
+                // Attempt to capture a stream from the canvas
+                // The stream resolution will be the internal canvas.width/height, which is high-res
+                const stream = canvas.captureStream(60); // Capture at 60 frames per second
+
+                // Create a MediaRecorder instance
+                const options = { mimeType: 'video/webm; codecs=vp9' };
+                 if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                     options.mimeType = 'video/webm; codecs=vp8';
+                      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                          options.mimeType = 'video/webm';
+                           if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                               options.mimeType = 'video/ogg; codecs=theora';
+                                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                                    statusText.textContent = "錯誤：瀏覽器不支援錄影功能。";
+                                    downloadButton.disabled = false;
+                                    console.error('MediaRecorder not supported in this browser.');
+                                    return;
+                                }
+                           }
+                      }
+                 }
+
+                mediaRecorder = new MediaRecorder(stream, options);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    statusText.textContent = "錄製完成，正在準備下載...";
+                    const blob = new Blob(recordedChunks, { type: options.mimeType });
+                    const url = URL.createObjectURL(blob);
+
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'zodiac_video.webm';
+                    document.body.appendChild(a);
+
+                    a.click();
+
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    statusText.textContent = "下載開始 (請檢查您的下載資料夾)";
+                    downloadButton.disabled = false;
+                };
+
+                mediaRecorder.start();
+
                 setTimeout(() => {
-                    event.target.style.outline = "2px solid #333"; // Reset outline
-                    setupNewRound();
-                }, 300); // Short delay before next round
-            } else {
-                // Incorrect click - game over for simplicity, or implement lives/penalty
-                // Optional: Visual feedback for incorrect click
-                event.target.style.outline = "3px solid red";
-                 setTimeout(() => {
-                    event.target.style.outline = "2px solid #333"; // Reset outline
-                    gameOver();
-                }, 300);
-                // For a more forgiving game, you could just call setupNewRound() or deduct points
+                    if (mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                    }
+                }, videoDuration);
+
+            } catch (e) {
+                statusText.textContent = "錄影失敗: " + e;
+                downloadButton.disabled = false;
+                console.error('Error starting mediaRecorder:', e);
             }
         }
 
-        function updateTimer() {
-            currentTime--;
-            timeDisplay.textContent = currentTime;
-            if (currentTime <= 0) {
-                clearInterval(timerInterval);
-                gameOver();
-            }
-        }
-        
-        function resetTimer() {
-            clearInterval(timerInterval);
-            currentTime = roundTime;
-            timeDisplay.textContent = currentTime;
-        }
 
-        function startGame() {
-            gameActive = true;
-            currentScore = 0;
-            scoreDisplay.textContent = currentScore;
-            
-            startScreen.style.display = 'none';
-            gameOverScreen.style.display = 'none';
-            gamePlayArea.style.display = 'block';
-            
-            setupNewRound();
-        }
+        // --- Event Listeners and Initial Setup ---
 
-        function gameOver() {
-            gameActive = false;
-            clearInterval(timerInterval);
-            finalScoreDisplay.textContent = currentScore;
-            gamePlayArea.style.display = 'none';
-            gameOverScreen.style.display = 'block';
-        }
+        // Handle window resize - re-initialize particles and canvas size
+        window.addEventListener('resize', initParticles);
 
-        startButton.addEventListener('click', startGame);
-        restartButton.addEventListener('click', startGame);
+        // Download button click handler
+        downloadButton.addEventListener('click', startRecording);
+
+        // Initial setup
+        initParticles(); // Initialize particles and canvas size with device pixel ratio
+        animate(); // Start the particle animation loop (which also draws text)
+
 
     </script>
+
 </body>
 </html>
