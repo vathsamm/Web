@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>12星座 黏另一半 (假影片播放器 含粒子下載 - 簡易版)</title>
+    <title>12星座 黏另一半 (前端 - 傳送畫面至後端)</title>
     <style>
         body {
             background-color: black; /* Black background for the whole page */
@@ -11,7 +11,7 @@
             font-family: sans-serif; /* Readable font */
             margin: 0; /* Remove default body margin */
             padding: 20px; /* Add some padding around content */
-            padding-bottom: 80px; /* Add padding at the bottom to prevent content hiding behind fixed button */
+            padding-bottom: 100px; /* Increased padding at the bottom for link + status */
             box-sizing: border-box;
             display: flex; /* Use flexbox to center the player */
             justify-content: center; /* Center horizontally */
@@ -90,6 +90,9 @@
             z-index: 100;
             backdrop-filter: blur(5px);
             -webkit-backdrop-filter: blur(5px);
+            display: flex; /* Use flexbox to center items */
+            flex-direction: column; /* Stack items vertically */
+            align-items: center; /* Center items horizontally */
         }
 
         #downloadButton {
@@ -101,6 +104,7 @@
             border: none;
             border-radius: 5px;
             transition: background-color 0.3s ease;
+            margin-bottom: 5px; /* Space below button */
         }
 
         #downloadButton:hover:not(:disabled) {
@@ -116,8 +120,22 @@
         #status {
             color: gray;
             font-size: 0.9em;
-            margin-top: 5px;
-            min-height: 1.1em; /* Ensure space for status text */
+            margin-top: 0;
+            margin-bottom: 5px; /* Space below status */
+            min-height: 1.1em;
+        }
+
+        #downloadLink {
+            display: none; /* Hide link initially */
+            color: #00ccff; /* Make link visible and colored */
+            text-decoration: underline;
+            font-size: 1em;
+            cursor: pointer;
+        }
+         .format-note {
+            color: rgba(255, 255, 255, 0.7); /* Slightly transparent white */
+            font-size: 0.8em;
+            margin-top: 10px;
         }
 
 
@@ -160,8 +178,10 @@
 
     <!-- Download section fixed at the bottom -->
     <div class="download-section">
-        <button id="downloadButton">下載影片 (簡易版)</button>
+        <button id="downloadButton">下載影片 (後端處理 MP4)</button>
         <p id="status"></p>
+        <a id="downloadLink" style="display: none;">點此下載影片</a> <!-- Download link added -->
+         <p class="format-note">將畫面傳送至後端伺服器處理並下載 MP4 檔案。</p>
     </div>
 
 
@@ -170,14 +190,24 @@
         const ctx = canvas.getContext('2d');
         const downloadButton = document.getElementById('downloadButton');
         const statusText = document.getElementById('status');
+        const downloadLink = document.getElementById('downloadLink');
         const videoContentDiv = document.querySelector('.video-content');
 
         let particles = [];
         const numberOfParticles = 60;
         let animationId;
-        let mediaRecorder;
-        const recordedChunks = [];
-        const videoDuration = 5000; // 5 seconds in milliseconds
+        let captureLoopId; // For the frame capture loop
+        const videoDuration = 5000; // 5 seconds in milliseconds - This is the *target* video length
+        const targetFps = 30; // Target frames per second for the output video
+        const frameCaptureInterval = 1000 / targetFps; // Milliseconds per frame
+        const totalFrames = Math.ceil(videoDuration / frameCaptureInterval); // Total frames to capture
+
+        // Array to store captured frame Blobs
+        const capturedFrameBlobs = [];
+
+        // --- Configuration for Backend ---
+        // *** IMPORTANT: Update this URL to your backend server address and endpoint ***
+        const backendUrl = 'http://localhost:3000/encode-video'; // Example: Node.js server on port 3000
 
         // Get text content from the hidden HTML
         const titleText = videoContentDiv.querySelector('h1').textContent;
@@ -347,117 +377,113 @@
             animationId = requestAnimationFrame(animate);
         }
 
-        // --- MediaRecorder Setup (Simple Download) ---
+        // --- Capture and Send to Backend Logic ---
 
-        function startRecording() {
-            statusText.textContent = "正在錄製影片 (5秒)...";
+        async function startEncodingBackend() {
+             // Hide previous download link if it exists
+            downloadLink.style.display = 'none';
+            downloadLink.removeAttribute('href');
+            downloadLink.removeAttribute('download');
+
+            statusText.textContent = "捕捉畫面中 (0%)...";
             downloadButton.disabled = true;
-            recordedChunks.length = 0; // Clear previous data
+            capturedFrameBlobs.length = 0; // Clear previous data
 
-            try {
-                // Attempt to capture a stream from the canvas
-                // Use default frame rate for potentially better stability vs 60fps
-                const stream = canvas.captureStream(); // CAPTURING AT BROWSER DEFAULT FRAME RATE (approx 30fps)
+            // Stop the main animation loop during capture to control frames precisely
+            cancelAnimationFrame(animationId);
 
-                 // Define preferred MIME types in order (MP4 first, then WebM fallbacks)
-                const preferredMimeTypes = [
-                    // Try H.264 MP4 first (support varies widely for canvas recording)
-                    'video/mp4; codecs="avc1.42001E"', // Specific H.264 profile, might have better luck
-                    'video/mp4; codecs=avc1', // Generic H.264
-                    'video/mp4', // Just MP4
-                    'video/webm; codecs=vp9', // High quality WebM
-                    'video/webm; codecs=vp8', // Older WebM
-                    'video/webm', // Generic WebM
-                    'video/ogg; codecs=theora' // Ogg fallback
-                ];
+            let frameCount = 0;
+            const startTime = performance.now();
+             let isCapturing = true; // Flag to control capture
 
-                let supportedMimeType = null;
-                for (let i = 0; i < preferredMimeTypes.length; i++) {
-                    if (MediaRecorder.isTypeSupported(preferredMimeTypes[i])) {
-                        supportedMimeType = preferredMimeTypes[i];
-                        break; // Use the first supported type found
-                    }
-                }
+             function captureFrameLoop() {
+                 if (!isCapturing) return; // Stop if flag is false
 
-                if (!supportedMimeType) {
-                    statusText.textContent = "錯誤：瀏覽器不支援任何錄影格式。";
-                    downloadButton.disabled = false;
-                    console.error('MediaRecorder supported type not found.');
-                    return;
-                }
+                 // Calculate time elapsed
+                 const elapsed = performance.now() - startTime;
 
-                const options = { mimeType: supportedMimeType };
-                 console.log("Using MIME type:", supportedMimeType); // Log which type was chosen
+                 // Stop capturing if duration is reached or exceeded total frames
+                 if (elapsed >= videoDuration || frameCount >= totalFrames) {
+                     isCapturing = false; // Stop the loop
+                     statusText.textContent = `捕捉完成 (${frameCount} 畫面)，傳送至後端...`;
+                     sendFramesToBackend(capturedFrameBlobs); // Send frames
+                     return; // Stop the loop
+                 }
 
+                 // Update particle positions
+                 for (let i = 0; i < particles.length; i++) {
+                    particles[i].update();
+                 }
+                 // Draw the current state
+                 drawCanvas();
 
-                mediaRecorder = new MediaRecorder(stream, options);
+                 // Capture the frame as a Blob
+                 // Using 'image/png' as it's lossless and widely compatible for FFmpeg input
+                 canvas.toBlob((blob) => {
+                     if (blob && isCapturing) { // Check isCapturing again in async callback
+                         capturedFrameBlobs.push(blob);
+                         frameCount++;
 
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
-                    }
-                };
+                         // Update status
+                         const progress = Math.min(100, Math.round((frameCount / totalFrames) * 100));
+                         statusText.textContent = `捕捉畫面中 (${progress}%)...`;
 
-                mediaRecorder.onstop = () => {
-                    statusText.textContent = "錄製完成，正在準備下載...";
-                    const blob = new Blob(recordedChunks, { type: supportedMimeType }); // Use the actual supported type for the Blob
-                    const url = URL.createObjectURL(blob);
+                         // Schedule next frame capture using requestAnimationFrame for smoother capture timing
+                         // This is generally better than setInterval for canvas animation capture
+                         requestAnimationFrame(captureFrameLoop);
 
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
+                     } else if (isCapturing) { // Handle toBlob failure if still trying to capture
+                         console.error('canvas.toBlob failed');
+                         isCapturing = false; // Stop capture on error
+                         statusText.textContent = "捕捉畫面失敗。";
+                         downloadButton.disabled = false;
+                         // Restart animation
+                         animate();
+                     }
+                 }, 'image/png');
+             }
 
-                    // Determine file extension based on the chosen MIME type
-                    let fileExtension = '.webm'; // Default to webm
-                    if (supportedMimeType.includes('mp4')) {
-                        fileExtension = '.mp4';
-                    } else if (supportedMimeType.includes('ogg')) {
-                         fileExtension = '.ogv'; // Ogg video extension
-                    }
-                    a.download = 'zodiac_video' + fileExtension; // Set download filename
-
-                    document.body.appendChild(a);
-
-                    a.click();
-
-                    // Clean up
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    statusText.textContent = "下載開始 (請檢查您的下載資料夾)";
-                    downloadButton.disabled = false;
-                };
-
-                mediaRecorder.start();
-
-                // Stop recording after 5 seconds
-                setTimeout(() => {
-                    if (mediaRecorder.state !== 'inactive') {
-                        mediaRecorder.stop();
-                    }
-                }, videoDuration);
-
-            } catch (e) {
-                statusText.textContent = "錄影失敗: " + e;
-                downloadButton.disabled = false;
-                console.error('Error starting mediaRecorder:', e);
-            }
+            // Start the capture loop using requestAnimationFrame
+            requestAnimationFrame(captureFrameLoop);
         }
 
 
-        // --- Event Listeners and Initial Setup ---
+        async function sendFramesToBackend(frameBlobs) {
+            if (frameBlobs.length === 0) {
+                statusText.textContent = "沒有捕捉到畫面進行處理。";
+                downloadButton.disabled = false;
+                animate(); // Restart animation
+                return;
+            }
 
-        // Handle window resize - re-initialize particles and canvas size
-        window.addEventListener('resize', initParticles);
+            const formData = new FormData();
+            for (let i = 0; i < frameBlobs.length; i++) {
+                // Append each blob with a unique name (e.g., frame_000.png)
+                formData.append('frames', frameBlobs[i], `frame_${String(i).padStart(4, '0')}.png`);
+            }
 
-        // Download button click handler
-        downloadButton.addEventListener('click', startRecording);
+            // Add metadata like FPS and duration to the form data
+            formData.append('fps', targetFps);
+            formData.append('duration', videoDuration / 1000); // Send duration in seconds
 
-        // Initial setup
-        initParticles(); // Initialize particles and canvas size with device pixel ratio
-        animate(); // Start the particle animation loop (which also draws text)
+             statusText.textContent = `傳送 ${frameBlobs.length} 畫面至後端...`;
+             console.log(`Sending ${frameBlobs.length} frames to backend...`);
 
+            try {
+                const response = await fetch(backendUrl, {
+                    method: 'POST',
+                    body: formData, // Send frames and metadata
+                    // Browser automatically sets Content-Type for FormData
+                });
 
-    </script>
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
 
-</body>
-</html>
+                // The backend sends the video back as a Blob or file download
+                const videoBlob = await response.blob();
+                const url = URL.createObjectURL(videoBlob);
+
+                // Assuming the backend sends the MP4 file directly
+                const a = document.createElemen
