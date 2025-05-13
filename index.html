@@ -3,370 +3,260 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sky-High Whiskers (Simple Demo)</title>
+    <title>Color Clicker</title>
     <style>
         body {
-            margin: 0;
-            overflow: hidden; /* Hide scrollbars */
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
+            justify-content: center;
             height: 100vh;
-            background-color: #f0f0f0; /* Fallback background */
+            margin: 0;
+            background-color: #f0f0f0;
         }
 
         #game-container {
-            width: 800px; /* Or 100vw for full width */
-            height: 600px; /* Or 100vh for full height */
-            position: relative;
-            border: 2px solid #333;
-            background-color: #87CEEB; /* Sky blue */
-            overflow: hidden; /* Keep elements within bounds */
+            text-align: center;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
         }
 
-        #cat {
-            width: 80px; /* Adjust size as needed */
-            height: 60px; /* Adjust size as needed */
-            /* You would use an actual cat image here */
-            background-color: orange; /* Placeholder cat color */
-            border-radius: 10px 10px 50% 50%; /* Simple cat-like shape */
-            position: absolute;
-            bottom: 50px; /* Starting position */
-            left: 100px;
-            transition: transform 0.1s ease-out; /* Smooth flapping */
-            /* For an image:
-            background-image: url('your-cat-image.png');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-color: transparent;
-            */
+        #instruction {
+            font-size: 28px;
+            margin-bottom: 20px;
+            font-weight: bold;
         }
-        #cat::before, #cat::after { /* Simple ears */
-            content: '';
-            position: absolute;
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 15px solid darkorange;
-            top: -10px;
-        }
-        #cat::before { left: 10px; transform: rotate(-15deg); }
-        #cat::after { right: 10px; transform: rotate(15deg); }
 
-
-        .cloud {
-            width: 150px;
-            height: 80px;
-            background-color: white;
-            border-radius: 50px;
-            position: absolute;
-            opacity: 0.8;
-            animation: moveCloud 20s linear infinite;
+        #color-squares {
+            display: grid;
+            grid-template-columns: repeat(2, 100px); /* 2x2 grid */
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 20px;
         }
-        .cloud.small {
-            width: 80px;
-            height: 40px;
-            animation-duration: 30s;
-            opacity: 0.6;
-        }
-        .cloud1 { top: 10%; left: -150px; }
-        .cloud2 { top: 30%; left: -200px; animation-delay: -5s; }
-        .cloud3 { top: 60%; left: -100px; animation-delay: -12s; }
 
-
-        .obstacle {
-            width: 50px;
-            height: 150px; /* Example height */
-            background-color: #556B2F; /* Dark green for a tree/pipe */
-            position: absolute;
-            bottom: 0; /* For obstacles from the ground */
-            /* Top obstacles would use 'top: 0;' */
-            animation: moveObstacle 5s linear infinite;
-        }
-        /* Example: a specific obstacle instance, JS would create these */
-        #obstacle1 {
-            right: -50px; /* Start off screen */
+        .square {
+            width: 100px;
             height: 100px;
-            animation-delay: -1s; /* Stagger appearance */
+            border: 2px solid #333;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        .square:hover {
+            transform: scale(1.05);
+        }
+        .square:active {
+            transform: scale(0.95);
         }
 
         #score-board {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            font-size: 24px;
-            color: white;
-            text-shadow: 1px 1px 2px black;
+            font-size: 22px;
+            margin-top: 10px;
+        }
+        #timer-board {
+            font-size: 18px;
+            color: #555;
         }
 
-        #start-screen, #game-over-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.7);
-            color: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            z-index: 10;
-        }
-        #game-over-screen {
-            display: none; /* Hidden initially */
-        }
-        button {
-            padding: 10px 20px;
+        #start-button, #restart-button {
+            padding: 12px 25px;
             font-size: 18px;
-            margin-top: 20px;
             cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
             border: none;
             border-radius: 5px;
-            background-color: #FFD700; /* Gold */
-            color: #333;
+            margin-top: 20px;
         }
-        button:hover {
-            background-color: #FFA500; /* Orange */
-        }
-
-
-        /* Animations */
-        @keyframes moveCloud {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(1000px); } /* Game container width + cloud width */
+        #start-button:hover, #restart-button:hover {
+            background-color: #45a049;
         }
 
-        @keyframes moveObstacle {
-            0% { right: -50px; } /* Start off screen */
-            100% { right: 850px; } /* Move across screen (game width + obstacle width) */
+        #game-over-screen {
+            display: none; /* Hidden initially */
+            text-align: center;
         }
+
     </style>
 </head>
 <body>
 
     <div id="game-container">
-        <div id="cat"></div>
-
-        <!-- Clouds for background effect -->
-        <div class="cloud cloud1"></div>
-        <div class="cloud cloud2 small"></div>
-        <div class="cloud cloud3"></div>
-
-        <!-- Example obstacle (normally generated by JS) -->
-        <!-- <div class="obstacle" id="obstacle1"></div> -->
-
-        <div id="score-board">Score: <span id="score">0</span></div>
-
         <div id="start-screen">
-            <h1>Sky-High Whiskers</h1>
-            <p>Press SPACE or Click to Fly!</p>
+            <h1>Color Clicker!</h1>
+            <p>Click the square that matches the color name.</p>
             <button id="start-button">Start Game</button>
         </div>
 
+        <div id="game-play-area" style="display: none;">
+            <div id="instruction">Click the Color: <span id="target-color-name">COLOR</span></div>
+            <div id="color-squares">
+                <!-- Squares will be generated here by JavaScript -->
+            </div>
+            <div id="score-board">Score: <span id="score">0</span></div>
+            <div id="timer-board">Time Left: <span id="time">10</span>s</div>
+        </div>
+
         <div id="game-over-screen">
-            <h1>Game Over!</h1>
-            <p>Your Score: <span id="final-score">0</span></p>
-            <button id="restart-button">Restart</button>
+            <h2>Game Over!</h2>
+            <p>Your Final Score: <span id="final-score">0</span></p>
+            <button id="restart-button">Play Again?</button>
         </div>
     </div>
 
     <script>
-        const cat = document.getElementById('cat');
-        const gameContainer = document.getElementById('game-container');
-        const scoreDisplay = document.getElementById('score');
+        const colors = [
+            { name: "RED", value: "#FF0000" },
+            { name: "BLUE", value: "#0000FF" },
+            { name: "GREEN", value: "#008000" },
+            { name: "YELLOW", value: "#FFFF00" },
+            { name: "PURPLE", value: "#800080" },
+            { name: "ORANGE", value: "#FFA500" },
+            { name: "PINK", value: "#FFC0CB" },
+            { name: "BLACK", value: "#000000" }
+        ];
+        const numSquares = 4; // Number of squares to display (e.g., 2x2 grid)
+        const roundTime = 10; // Time per round in seconds
+
         const startScreen = document.getElementById('start-screen');
+        const gamePlayArea = document.getElementById('game-play-area');
         const gameOverScreen = document.getElementById('game-over-screen');
+
+        const instructionText = document.getElementById('target-color-name');
+        const colorSquaresContainer = document.getElementById('color-squares');
+        const scoreDisplay = document.getElementById('score');
+        const timeDisplay = document.getElementById('time');
         const finalScoreDisplay = document.getElementById('final-score');
+
         const startButton = document.getElementById('start-button');
         const restartButton = document.getElementById('restart-button');
 
-        let catY = parseInt(window.getComputedStyle(cat).getPropertyValue('bottom'));
-        let catVelocityY = 0;
-        const gravity = 0.8; // Pull downwards
-        const jumpStrength = 15; // How high the cat jumps
-        let score = 0;
-        let gameInterval;
-        let obstacleInterval;
-        let obstacles = [];
-        let gameRunning = false;
-        const gameContainerHeight = gameContainer.clientHeight;
+        let currentScore = 0;
+        let currentTime = roundTime;
+        let targetColor;
+        let timerInterval;
+        let gameActive = false;
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function getRandomColors(count, ensureColor) {
+            let availableColors = [...colors];
+            // Remove ensureColor from availableColors to avoid duplicates if it's picked as a distractor
+            availableColors = availableColors.filter(c => c.name !== ensureColor.name);
+            
+            shuffleArray(availableColors);
+            
+            let chosenDistractors = availableColors.slice(0, count - 1);
+            let finalSquares = [ensureColor, ...chosenDistractors];
+            
+            return shuffleArray(finalSquares); // Shuffle the final set including the target
+        }
+
+        function setupNewRound() {
+            if (!gameActive) return;
+
+            // Pick a random target color
+            targetColor = colors[Math.floor(Math.random() * colors.length)];
+            instructionText.textContent = targetColor.name;
+            // Optional: Stroop effect (text color different from target color name)
+            // const randomTextColor = colors[Math.floor(Math.random() * colors.length)].value;
+            // instructionText.style.color = randomTextColor;
+
+
+            // Get colors for squares
+            const squareColors = getRandomColors(numSquares, targetColor);
+
+            colorSquaresContainer.innerHTML = ''; // Clear previous squares
+            squareColors.forEach(colorObj => {
+                const square = document.createElement('div');
+                square.classList.add('square');
+                square.style.backgroundColor = colorObj.value;
+                square.dataset.colorName = colorObj.name; // Store the color name
+                square.addEventListener('click', handleSquareClick);
+                colorSquaresContainer.appendChild(square);
+            });
+
+            currentTime = roundTime;
+            timeDisplay.textContent = currentTime;
+            resetTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function handleSquareClick(event) {
+            if (!gameActive) return;
+
+            const clickedColorName = event.target.dataset.colorName;
+            clearInterval(timerInterval); // Stop timer on click
+
+            if (clickedColorName === targetColor.name) {
+                currentScore++;
+                scoreDisplay.textContent = currentScore;
+                // Optional: Add a small visual feedback for correct click
+                event.target.style.outline = "3px solid lightgreen";
+                setTimeout(() => {
+                    event.target.style.outline = "2px solid #333"; // Reset outline
+                    setupNewRound();
+                }, 300); // Short delay before next round
+            } else {
+                // Incorrect click - game over for simplicity, or implement lives/penalty
+                // Optional: Visual feedback for incorrect click
+                event.target.style.outline = "3px solid red";
+                 setTimeout(() => {
+                    event.target.style.outline = "2px solid #333"; // Reset outline
+                    gameOver();
+                }, 300);
+                // For a more forgiving game, you could just call setupNewRound() or deduct points
+            }
+        }
+
+        function updateTimer() {
+            currentTime--;
+            timeDisplay.textContent = currentTime;
+            if (currentTime <= 0) {
+                clearInterval(timerInterval);
+                gameOver();
+            }
+        }
+        
+        function resetTimer() {
+            clearInterval(timerInterval);
+            currentTime = roundTime;
+            timeDisplay.textContent = currentTime;
+        }
 
         function startGame() {
-            catY = 50; // Reset cat position
-            cat.style.bottom = catY + 'px';
-            catVelocityY = 0;
-            score = 0;
-            updateScoreDisplay();
-            obstacles.forEach(obs => obs.element.remove()); // Clear old obstacles
-            obstacles = [];
+            gameActive = true;
+            currentScore = 0;
+            scoreDisplay.textContent = currentScore;
             
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
-            gameRunning = true;
-
-            gameInterval = setInterval(gameLoop, 20); // Main game loop (50 FPS)
-            obstacleInterval = setInterval(createObstacle, 2000); // Create obstacles every 2 seconds
-
-            // Initial flap to prevent immediate fall if user doesn't click fast
-            // flap();
-        }
-
-        function flap() {
-            if (!gameRunning) return;
-            catVelocityY = jumpStrength;
-        }
-
-        function gameLoop() {
-            if (!gameRunning) return;
-
-            // Apply gravity
-            catVelocityY -= gravity;
-            catY += catVelocityY;
-
-            // Prevent cat from going below ground
-            if (catY <= 0) {
-                catY = 0;
-                catVelocityY = 0;
-                gameOver();
-            }
-            // Prevent cat from going above screen
-            if (catY >= gameContainerHeight - cat.offsetHeight) {
-                catY = gameContainerHeight - cat.offsetHeight;
-                catVelocityY = 0;
-            }
-
-            cat.style.bottom = catY + 'px';
-
-            // Move and check obstacles
-            moveObstacles();
-            checkCollisions();
-        }
-
-        function createObstacle() {
-            if (!gameRunning) return;
-
-            const obstacleHeight = Math.random() * (gameContainerHeight / 2) + 50; // Random height
-            const obstacleIsTop = Math.random() > 0.5; // 50% chance top, 50% bottom
-
-            const obstacleElement = document.createElement('div');
-            obstacleElement.classList.add('obstacle');
-            obstacleElement.style.width = '60px'; // Obstacle width
-            obstacleElement.style.height = obstacleHeight + 'px';
-            obstacleElement.style.backgroundColor = '#228B22'; // Forest Green
-            obstacleElement.style.position = 'absolute';
-            obstacleElement.style.right = '-60px'; // Start off-screen
-
-            if (obstacleIsTop) {
-                obstacleElement.style.top = '0px';
-                obstacleElement.style.borderBottomLeftRadius = '10px';
-                obstacleElement.style.borderBottomRightRadius = '10px';
-            } else {
-                obstacleElement.style.bottom = '0px';
-                obstacleElement.style.borderTopLeftRadius = '10px';
-                obstacleElement.style.borderTopRightRadius = '10px';
-            }
-
-            gameContainer.appendChild(obstacleElement);
-            obstacles.push({
-                element: obstacleElement,
-                passed: false // To track for scoring
-            });
-        }
-
-        function moveObstacles() {
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                let obs = obstacles[i];
-                let currentRight = parseFloat(window.getComputedStyle(obs.element).getPropertyValue('right'));
-                obs.element.style.right = (currentRight + 5) + 'px'; // Speed of obstacles
-
-                // Score point if cat passes obstacle
-                if (!obs.passed && (parseFloat(obs.element.style.right) + obs.element.offsetWidth) > (gameContainer.offsetWidth - cat.offsetLeft - cat.offsetWidth) &&
-                    parseFloat(obs.element.style.right) < (gameContainer.offsetWidth - cat.offsetLeft)
-                ) {
-                   // A bit complex for passing logic, simplified:
-                   // If obstacle's right edge has passed the cat's left edge
-                   if (!obs.passed && (parseFloat(obs.element.style.right) + obs.element.offsetWidth) > (gameContainer.offsetWidth - (cat.offsetLeft + cat.offsetWidth))) {
-                       // And if the obstacle's left edge has not yet passed the cat's right edge
-                       if (parseFloat(obs.element.style.right) < (gameContainer.offsetWidth - cat.offsetLeft)) {
-                           // Check if this is the *first* obstacle of a pair (if making pipes)
-                           // For simplicity, we score once per obstacle object that starts moving past.
-                           // A more robust way would be to score when passing a "gap" between pipes.
-                       }
-                   }
-                }
-                
-                // A simpler way to score: when obstacle moves past a certain point (e.g., cat's fixed x position)
-                let catFixedXPosition = cat.offsetLeft + cat.offsetWidth / 2; // Center of the cat
-                let obstacleRightEdge = gameContainer.offsetWidth - (parseFloat(obs.element.style.right) + obs.element.offsetWidth);
-
-                if (!obs.passed && obstacleRightEdge > catFixedXPosition) {
-                    score++;
-                    obs.passed = true; // Mark as passed to not score again
-                    updateScoreDisplay();
-                }
-
-
-                // Remove obstacle if it's off-screen
-                if (currentRight > gameContainer.offsetWidth) {
-                    obs.element.remove();
-                    obstacles.splice(i, 1);
-                }
-            }
-        }
-        
-        function checkCollisions() {
-            const catRect = cat.getBoundingClientRect();
-
-            for (let obs of obstacles) {
-                const obsRect = obs.element.getBoundingClientRect();
-                if (
-                    catRect.left < obsRect.right &&
-                    catRect.right > obsRect.left &&
-                    catRect.top < obsRect.bottom &&
-                    catRect.bottom > obsRect.top
-                ) {
-                    gameOver();
-                    return;
-                }
-            }
-        }
-
-        function updateScoreDisplay() {
-            scoreDisplay.textContent = score;
+            gamePlayArea.style.display = 'block';
+            
+            setupNewRound();
         }
 
         function gameOver() {
-            gameRunning = false;
-            clearInterval(gameInterval);
-            clearInterval(obstacleInterval);
-            finalScoreDisplay.textContent = score;
-            gameOverScreen.style.display = 'flex';
+            gameActive = false;
+            clearInterval(timerInterval);
+            finalScoreDisplay.textContent = currentScore;
+            gamePlayArea.style.display = 'none';
+            gameOverScreen.style.display = 'block';
         }
-        
-        // Event Listeners
-        document.addEventListener('keydown', function(e) {
-            if (e.code === 'Space' && gameRunning) {
-                flap();
-            } else if (e.code === 'Space' && !gameRunning && startScreen.style.display !== 'none') {
-                startGame();
-            } else if (e.code === 'Space' && !gameRunning && gameOverScreen.style.display !== 'none') {
-                startGame();
-            }
-        });
-
-        gameContainer.addEventListener('click', function() {
-            if (gameRunning) {
-                flap();
-            }
-        });
 
         startButton.addEventListener('click', startGame);
         restartButton.addEventListener('click', startGame);
 
     </script>
 </body>
-  </html>
+</html>
